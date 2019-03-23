@@ -1,0 +1,124 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+import sympy as sp
+import numpy as np
+import matplotlib as plt 
+from IPython.display import display,Latex,Math 
+
+
+# In[2]:
+
+
+#Hier die Variablen deklarieren/ "z" ist reserviert und darf nicht verwendet werden
+h,r,T = sp.symbols('h r T') #hier Variablennamen einsetzen
+variablen = [h,r,T]         #hier Variablennamen einsetzen
+#Zahlenwerte und Fehlerwerte
+variablen_werte = [2.8,4.2,2.4]    #Werte h=2.8, r=4.2, T=2.4 /hier Werte einsetzen
+sfehler_werte = [0.01,0.03,0.01]   #systematische Fehlerwerte für einzelne Größen 
+zfehler_werte = [0.05,0.02,0]      #zufällige Fehlerwerte für einzelne Größen
+
+
+# In[3]:
+
+
+#Funktion deklarieren, bei sin, exp etc. sp. davor schreiben, ansonsten bei Exponenten anstatt '^', '**' benutzen  
+funktion = h**2*r*sp.sin(T)
+
+
+# In[4]:
+
+
+fehler_werte = []                         #erstellt Liste mit den gesamten Fehler der einzelnen Größen
+for z in range(0,len(variablen)):
+    fehler_werte.append(sfehler_werte[z] + zfehler_werte[z])       
+
+
+# In[5]:
+
+
+#Entscheidung über Art der Fehlerfortpflanzung 
+zufall = 0 
+system = 0 
+fehler_symbole = []
+quad_ableitungen = []                        
+decision_maker = []                          #0 = lineare Fehlerfortpflanzung, 1 = quadratische Fehlerfortpflanzung
+
+for var in variablen:                        #z wird später mit den Fehlern ersetzt
+    z = sp.symbols('z'+var.name)             #erstellen Symbole nachdenen später differenziert werden soll 
+    fehler_symbole.append(z)
+    partial = sp.diff(funktion,var)*z
+    quad_ableitungen.append(partial**2)
+
+for z in range(0,len(variablen)):
+    if sfehler_werte[z]>zfehler_werte[z]:
+        system += quad_ableitungen[z] 
+    else:
+        zufall += quad_ableitungen[z] 
+
+        
+lin_error1=sp.Subs(system,variablen,variablen_werte).doit()
+lin_error2=sp.Subs(lin_error1,fehler_symbole, fehler_werte).doit()
+
+quad_error1=sp.Subs(zufall,variablen,variablen_werte).doit()
+quad_error2=sp.Subs(quad_error1,fehler_symbole,fehler_werte).doit()
+
+if quad_error2>lin_error2:
+    decision_maker.append(1)
+    print('zufälliger Fehler überwiegt --> quadratische Fehlerfortpflanzung, da:')
+    
+    display(Math(sp.latex(system).replace('z',r'\Delta ')+' < '+sp.latex(zufall).replace('z',r'\Delta '))) 
+    display(Math(sp.latex(lin_error2) + '<' + sp.latex(quad_error2)))
+
+else: 
+    decision_maker.append(0)
+    print('systematischer Fehler überwiegt --> lineare Fehlerfortpflanzung, da:')
+    display(Math(sp.latex(system).replace('z',r'\Delta ')+' > '+sp.latex(zufall).replace('z',r'\Delta '))) 
+    display(Math(sp.latex(lin_error2) + '>' + sp.latex(quad_error2)))
+
+
+# In[6]:
+
+
+#Fortsetzung der Fehlerrechung, da nun Art und Weise feststeht
+abs_fehler = 0
+rel_fehler = 0 
+
+funktionswert = sp.Subs(funktion,variablen,variablen_werte).doit() 
+print('Funktion:')
+display(Math(r'f ='+sp.latex(funktion)+'='+str(funktionswert)))
+
+if decision_maker[0] == 0:                      #lineare Fehlerfortpflanzung 
+    for z in range(0,len(variablen)):
+        abs_fehler += sp.sqrt(np.absolute(quad_ableitungen[z]))
+    
+    abs_fehler = sp.simplify(abs_fehler)
+    error1 = sp.Subs(abs_fehler,variablen,variablen_werte)
+    abs_fehlerwert = sp.Subs(error1,fehler_symbole, fehler_werte).doit()
+    rel_fehler = abs_fehlerwert/funktionswert
+    
+    
+
+else:                                           #quadratische Fehlerfortpflanzung 
+    for z in range(0,len(variablen)):
+        abs_fehler += np.absolute(quad_ableitungen[z])
+        
+    abs_fehler = sp.simplify(sp.sqrt(abs_fehler))
+    error1 = sp.Subs(abs_fehler,variablen,variablen_werte)
+    abs_fehlerwert = sp.Subs(error1,fehler_symbole, fehler_werte).doit()
+    rel_fehler = abs_fehlerwert/funktionswert
+   
+print('absoluter Fehler:')
+display(Math(r'\Delta f ='+ sp.latex(abs_fehler).replace('z',r'\Delta ') +'='+ str(abs_fehlerwert)))
+print('relativer Fehler:')
+display(Math(r' \frac{\Delta f}{f} =' + str(rel_fehler)))
+
+
+# In[ ]:
+
+
+
+
